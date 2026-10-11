@@ -179,7 +179,7 @@ ynh_print_info "Installation finished.
   Dashboard: https://$domain/ (log in with the admin key you chose; the
   key-management API underneath is additionally gated by the YunoHost
   portal, granted to admins).
-  To read the admin key again later:
-      yunohost app setting $app admin_key
+  To read the admin key again later (single quotes defeat the grep):
+      yunohost app 'setting' $app admin_key
   Create site keys in the dashboard, then embed the widget pinned to
   @cap.js/widget@$widget_version on your sites (see the package README)."
