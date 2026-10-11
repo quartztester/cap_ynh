@@ -1,0 +1,108 @@
+#!/bin/bash
+
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+ynh_abort_if_errors
+
+#=================================================
+# LOAD SETTINGS
+#=================================================
+
+ynh_script_progression "Loading settings..."
+
+admin_key=$(ynh_app_setting_get --app="$app" --key=admin_key)
+redis_password=$(ynh_app_setting_get --app="$app" --key=redis_password)
+widget_version=$(ynh_app_setting_get --app="$app" --key=widget_version)
+wasm_version=$(ynh_app_setting_get --app="$app" --key=wasm_version)
+assets_server=$(ynh_app_setting_get --app="$app" --key=assets_server)
+[ -n "$assets_server" ] || assets_server=false
+
+if [ "${path:-/}" != "/" ]; then
+    ynh_die "cap must be installed at the root of a domain (path=/)."
+fi
+
+#=================================================
+# STOP SERVICES
+#=================================================
+
+ynh_script_progression "Stopping cap services..."
+
+ynh_systemctl --service="$app" --action=stop
+
+#=================================================
+# DOWNLOAD AND UNPACK SOURCE
+#=================================================
+
+ynh_script_progression "Upgrading source files..."
+
+# Fresh monorepo into $install_dir/.repo; cap_place_standalone swaps the
+# app files into place while preserving node_modules (rebuilt below from
+# the new bun.lock), .bun-cache, bin/ (replaced next), env, redis.conf.
+ynh_setup_source --dest_dir="$install_dir/.repo"
+cap_place_standalone
+
+ynh_setup_source --source_id=bun --dest_dir="$install_dir/bin"
+chmod 755 "$install_dir/bin/bun"
+
+#=================================================
+# JS DEPENDENCIES
+#=================================================
+
+ynh_script_progression "Reinstalling JS dependencies..."
+
+ynh_exec_as_app env HOME="$install_dir" \
+    bash -c "cd '$install_dir' && '$install_dir/bin/bun' install --production --frozen-lockfile --cache-dir '$install_dir/.bun-cache'" \
+    || ynh_die "bun install failed"
+
+chown -R "$app:$app" "$install_dir"
+
+#=================================================
+# RE-RENDER CONFIGS
+#=================================================
+
+ynh_script_progression "Re-rendering configuration..."
+
+ynh_delete_file_checksum --file="$install_dir/redis.conf"
+redis_port="$port_redis"
+ynh_config_add --template=redis.conf --destination="$install_dir/redis.conf"
+chown "$app:$app" "$install_dir/redis.conf"
+chmod 640 "$install_dir/redis.conf"
+
+ynh_delete_file_checksum --file="$install_dir/env"
+ynh_config_add --template=env --destination="$install_dir/env"
+chown "$app:$app" "$install_dir/env"
+chmod 600 "$install_dir/env"
+
+ynh_config_add_systemd
+ynh_config_add_systemd --service="${app}-redis" --template=redis.service
+
+#=================================================
+# RESTART SERVICES
+#=================================================
+
+ynh_script_progression "Restarting cap services..."
+
+ynh_systemctl --service="${app}-redis" --action=restart
+ynh_systemctl --service="$app" --action=restart
+
+cap_wait_ready
+
+#=================================================
+# NGINX
+#=================================================
+
+ynh_config_add_nginx
+
+if ! ynh_hide_warnings yunohost service status "$app" >/dev/null 2>&1; then
+    yunohost service add "$app" --description="cap proof-of-work captcha server"
+fi
+if ! ynh_hide_warnings yunohost service status "${app}-redis" >/dev/null 2>&1; then
+    yunohost service add "${app}-redis" --description="Private redis instance for cap ($app)"
+fi
+
+ynh_script_progression "Upgrade complete."

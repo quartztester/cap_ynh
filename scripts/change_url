@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+ynh_abort_if_errors
+
+#=================================================
+# CHECK NEW PATH
+#=================================================
+
+if [ "${new_path:-/}" != "/" ]; then
+    ynh_die "cap must live at the root of a domain (its admin UI uses root-absolute redirects)."
+fi
+
+#=================================================
+# STOP SERVICE
+#=================================================
+
+ynh_script_progression "Stopping $app's systemd service..."
+
+ynh_systemctl --service="$app" --action=stop
+
+#=================================================
+# UPDATE CONFIG
+#=================================================
+
+ynh_script_progression "Updating cap configuration for the new domain..."
+
+# NB: the env file carries no domain-dependent values (loopback binds +
+# secrets only), so no re-render is needed on a domain move.
+
+#=================================================
+# UPDATE NGINX CONF
+#=================================================
+
+ynh_config_change_url_nginx
+
+# The `admin` permission URL is a domain-pinned regex rendered at install
+# time; change_url does not rewrite it, so re-pin it to the new domain.
+ynh_permission_url --permission=admin \
+    --url="re:^${new_domain}\/(?:server(?:\/.*)?|auth(?:\/.*)?|public(?:\/.*)?)$"
+
+#=================================================
+# RESTART SERVICE
+#=================================================
+
+ynh_script_progression "Restarting $app..."
+
+ynh_systemctl --service="$app" --action=start
+
+cap_wait_ready
+
+ynh_script_progression "Change of URL completed for $app"

@@ -1,0 +1,124 @@
+#:schema https://raw.githubusercontent.com/YunoHost/apps/main/schemas/manifest.v2.schema.json
+
+packaging_format = 2
+
+id = "cap"
+name = "cap"
+description.en = "Privacy-first self-hosted captcha: proof-of-work, no puzzles, no tracking"
+description.fr = "Captcha auto-hébergé respectueux de la vie privée : preuve de travail, sans énigme ni pistage"
+
+version = "3.1.13~ynh1"
+
+maintainers = ["quartztester"]
+
+[upstream]
+license = "Apache-2.0"
+website = "https://trycap.dev"
+demo = "https://trycap.dev/guide/demo"
+admindoc = "https://trycap.dev/guide/standalone/installation"
+code = "https://github.com/tiagozip/cap"
+
+[integration]
+yunohost = ">= 12.0"
+helpers_version = "2.1"
+# The bun runtime binary is pinned per-architecture (amd64/arm64).
+architectures = ["amd64", "arm64"]
+multi_instance = true
+ldap = "not_relevant"
+# The admin surface (dashboard, key-management API) is gated by the
+# YunoHost portal; the captcha endpoints visitors use stay public.
+sso = "partial"
+disk = "1G"
+ram.build = "512M"
+ram.runtime = "384M"
+
+[install]
+    [install.domain]
+    type = "domain"
+
+    [install.path]
+    type = "path"
+    default = "/"
+
+    [install.init_main_permission]
+    type = "group"
+    default = "visitors"
+    help.en = "Must stay 'visitors': visitors of the websites protected by cap fetch challenges and redeem tokens anonymously. The admin dashboard and key-management API are protected separately by the YunoHost portal (granted to admins)."
+
+    [install.admin_key]
+    ask.en = "cap admin key (dashboard + API master key)"
+    help.en = "At least 12 characters. This key replaces reCAPTCHA's secret on your backends only for key management; per-site secret keys are created inside the dashboard. It is stored in the app settings — to read it later: 'yunohost app setting cap admin_key'."
+    type = "password"
+
+[resources]
+    [resources.sources]
+        [resources.sources.main]
+        # Upstream monorepo tarball; in_subdir=1 strips only <repo-root>/,
+        # leaving the standalone/ subdir which scripts/install moves into
+        # place. (in_subdir=2 would flatten ALL second-level dirs — docs/,
+        # .github/ ... — and clobber standalone/package.json.)
+        url = "https://github.com/tiagozip/cap/archive/refs/tags/standalone@3.1.13.tar.gz"
+        sha256 = "01d792b195efa27f26a4c5b531a1c42dd0ee18450accda6101663ac0830ef91d"
+        in_subdir = 1
+
+        [resources.sources.bun]
+        # Pinned bun runtime (upstream's Dockerfile uses oven/bun 1.4; the
+        # standalone server is plain Bun/Elysia JS — no compile step).
+        # Update both URLs + sha256 + manifest version together on upgrade.
+        format = "zip"
+        extract = true
+        in_subdir = true
+        amd64.url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64.zip"
+        amd64.sha256 = "3e730528d89775f03f87f05c06787c4df4099d0a37f3f252e7b829cb23816e18"
+        arm64.url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-aarch64.zip"
+        arm64.sha256 = "efa9813da5ed72423bf847f916e8d2c47c0d776add972354026a75e10da9aa21"
+
+    [resources.system_user]
+
+    [resources.install_dir]
+    owner = "__APP__:rwx"
+    group = "__APP__:rx"
+
+    [resources.data_dir]
+    subdirs = ["redis"]
+    owner = "__APP__:rwx"
+    group = "__APP__:rwx"
+
+    [resources.permissions]
+        # Public surface (visitors of sites that embed the widget):
+        #   POST /<siteKey>/challenge, /<siteKey>/redeem, /siteverify,
+        #   /assets/* (opt-in widget/wasm mirror), /health*, /share/<token>.
+        # These must never bounce through the portal, so `main` is public.
+        main.url = "/"
+        main.auth_header = false
+
+        # Private surface, portal-gated:
+        #   /server/*   key-management/settings API
+        #   /auth/*     admin-key login endpoint
+        #   /public/*   dashboard JS/CSS
+        # Site keys are 10 hex chars, so no route collision. Non-capturing
+        # groups only: ssowat keeps the regex match with the LONGEST match,
+        # and capture groups would shorten the returned match below the
+        # public main '/' prefix and silently lose the gate. The root "/"
+        # itself stays public (shows cap's login form; useless without the
+        # key and its /auth/login submit is portal-gated). Everyone holding
+        # this permission can create/delete captcha keys.
+        admin.url = "re:^__DOMAIN__\\/(?:server(?:\\/.*)?|auth(?:\\/.*)?|public(?:\\/.*)?)$"
+        admin.protected = true
+        admin.allowed = ["admins"]
+        # Regex URLs cannot render a portal tile; the tile comes from
+        # `main` (public), which opens the portal-gated dashboard anyway.
+        admin.show_tile = false
+        admin.auth_header = false
+
+    [resources.ports]
+        # cap HTTP (nginx -> bun app) and the private redis instance.
+        # Both bound to loopback by the app itself; never firewall-allowed.
+        main.default = 3853
+        redis.default = 3854
+
+    [resources.apt]
+        # redis-server: only the binary is used, for a private per-app
+        # instance (own config/port/dump in $data_dir — upstream ships a
+        # dedicated valkey container for exactly this). unzip: bun asset.
+        packages = ["redis-server", "unzip"]

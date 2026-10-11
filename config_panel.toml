@@ -1,0 +1,34 @@
+version = "1.0"
+
+[main]
+
+    [main.admin]
+    name = "Administration"
+
+        [main.admin.admin_key]
+        ask = "Admin key (dashboard + key-management master key)"
+        type = "string"
+        help = "Changing this rotates the master key: you must update the key your backends use for /server/* calls, and re-login to the dashboard. At least 12 characters."
+        bind = "settings"
+
+    [main.assets]
+    name = "Client assets (widget / wasm)"
+
+        [main.assets.assets_server]
+        ask = "Self-host the widget.js / wasm asset mirror on this server?"
+        type = "select"
+        choices = ["false", "true"]
+        help = "false (default): embed the official CDN copies. true: cap caches the pinned widget/wasm files itself and serves them under /assets/ (public route)."
+        bind = "settings"
+
+        [main.assets.widget_version]
+        ask = "Pinned @cap.js/widget version"
+        type = "string"
+        help = "Only used when the asset mirror is enabled, and as the documented version to embed."
+        bind = "settings"
+
+        [main.assets.wasm_version]
+        ask = "Pinned @cap.js/wasm version"
+        type = "string"
+        help = "Only used when the asset mirror is enabled."
+        bind = "settings"

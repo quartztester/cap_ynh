@@ -1,0 +1,185 @@
+#!/bin/bash
+
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+ynh_abort_if_errors
+
+#=================================================
+# CHECK INSTALL PATH
+#=================================================
+
+# cap issues root-absolute redirects (static.js redirects "/" on
+# unauthenticated dashboard loads, share.js redirects "/share"), so it must
+# own the root of its domain.
+if [ "${path:-/}" != "/" ]; then
+    ynh_die "cap must be installed at the root of a domain (path=/): its admin UI uses root-absolute redirects."
+fi
+
+# The app refuses to boot without a >=12-char ADMIN_KEY.
+if [ -z "${admin_key}" ] || [ "${#admin_key}" -lt 12 ]; then
+    ynh_die "The admin key must be at least 12 characters."
+fi
+
+#=================================================
+# INITIALIZE SETTINGS
+#=================================================
+
+# Secrets kept in app settings so env re-render (upgrade/restore/config)
+# works from settings alone. The redis password is generated here and
+# NEVER shown in install output.
+redis_password=$(ynh_string_random --length=48)
+ynh_app_setting_set --key=redis_password --value="$redis_password"
+ynh_app_setting_set --key=admin_key --value="$admin_key"
+
+# Pinned client-asset versions, mirrored in the env file so switching the
+# opt-in asset server on stays consistent with what the docs tell you to
+# embed. Read as $widget_version / $wasm_version by conf/env.
+ynh_app_setting_set_default --key=widget_version --value="0.1.58"
+ynh_app_setting_set_default --key=wasm_version --value="0.0.8"
+ynh_app_setting_set_default --key=assets_server --value="false"
+widget_version=$(ynh_app_setting_get --app="$app" --key=widget_version)
+wasm_version=$(ynh_app_setting_get --app="$app" --key=wasm_version)
+assets_server=$(ynh_app_setting_get --app="$app" --key=assets_server)
+
+#=================================================
+# DOWNLOAD, CHECK AND UNPACK SOURCE
+#=================================================
+
+ynh_script_progression "Setting up source files (native Bun/Elysia server, no Docker)..."
+
+# Extract the monorepo (strip 1) into $install_dir/.repo, then move
+# standalone/ up into $install_dir (see cap_place_standalone in _common.sh
+# for why in_subdir=2 is wrong).
+ynh_setup_source --dest_dir="$install_dir/.repo"
+cap_place_standalone
+ynh_setup_source --source_id=bun --dest_dir="$install_dir/bin"
+
+chmod 755 "$install_dir/bin/bun"
+
+#=================================================
+# INSTALL JS DEPENDENCIES (offline, from bun.lock)
+#=================================================
+
+ynh_script_progression "Installing JS dependencies with bun (elysia, maxmind, capjs-core)..."
+
+# --frozen-lockfile: exact versions from bun.lock. HOME points inside
+# $install_dir: the system user has no writable home, and the cache is
+# kept out of /root. Kept in-tree (--keep on upgrades) under a dotted
+# name that never shadows app paths.
+ynh_exec_as_app env HOME="$install_dir" \
+    bash -c "cd '$install_dir' && '$install_dir/bin/bun' install --production --frozen-lockfile --cache-dir '$install_dir/.bun-cache'" \
+    || ynh_die "bun install failed"
+
+ynh_app_setting_set --key=bun_version --value="1.4.3"
+
+chown -R "$app:$app" "$install_dir"
+
+#=================================================
+# PRIVATE REDIS INSTANCE (config + systemd unit)
+#=================================================
+
+ynh_script_progression "Configuring cap's private redis instance..."
+
+# Own config, port ($port_redis), dump dir under $data_dir/redis — the
+# shared system redis stays untouched (upstream's compose ships a
+# dedicated valkey container for the same reason).
+redis_port="$port_redis"
+ynh_config_add --template=redis.conf --destination="$install_dir/redis.conf"
+chown "$app:$app" "$install_dir/redis.conf"
+chmod 640 "$install_dir/redis.conf"
+
+mkdir -p "$data_dir/redis"
+chown -R "$app:$app" "$data_dir/redis"
+
+ynh_config_add_systemd --service="${app}-redis" --template=redis.service
+
+ynh_systemctl --service="${app}-redis" --action=start
+
+redis_ready=""
+for i in $(seq 1 30); do
+    if redis-cli -h 127.0.0.1 -p "$port_redis" -a "$redis_password" --no-auth-warning ping 2>/dev/null | grep -q PONG; then
+        redis_ready=1
+        break
+    fi
+    sleep 1
+done
+[ -n "$redis_ready" ] || ynh_die "cap's private redis did not answer PING on 127.0.0.1:$port_redis"
+
+#=================================================
+# APP ENV FILE
+#=================================================
+
+ynh_script_progression "Configuring cap..."
+
+ynh_config_add --template=env --destination="$install_dir/env"
+chown "$app:$app" "$install_dir/env"
+chmod 600 "$install_dir/env"
+
+#=================================================
+# SYSTEMD SERVICE
+#=================================================
+
+ynh_config_add_systemd
+
+#=================================================
+# INTEGRATE SERVICE IN YUNOHOST
+#=================================================
+
+yunohost service add "$app" --description="cap proof-of-work captcha server"
+yunohost service add "${app}-redis" --description="Private redis instance for cap ($app)"
+
+#=================================================
+# START THE APP
+#=================================================
+
+ynh_script_progression "Starting cap..."
+
+ynh_systemctl --service="$app" --action=start
+
+# /health/live answers as soon as the process is up (no redis needed).
+cap_ready=""
+for i in $(seq 1 30); do
+    if curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$port/health/live" | grep -q "^200$"; then
+        cap_ready=1
+        break
+    fi
+    sleep 1
+done
+if [ -z "$cap_ready" ]; then
+    journalctl --quiet --no-pager --lines=50 --unit="$app" >&2 || true
+    ynh_die "cap did not start serving on http://127.0.0.1:$port"
+fi
+
+# Full health (app + redis) must also pass.
+if ! curl -s --max-time 5 "http://127.0.0.1:$port/health" | grep -q '"ok"'; then
+    journalctl --quiet --no-pager --lines=50 --unit="$app" >&2 || true
+    ynh_die "cap /health reports unavailable (redis?)"
+fi
+
+#=================================================
+# NGINX
+#=================================================
+
+ynh_script_progression "Configuring nginx web server..."
+
+ynh_config_add_nginx
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+
+ynh_app_setting_set --key=skip_orphan_backup_alert --value=1
+
+ynh_print_info "Installation finished.
+  Dashboard: https://$domain/ (log in with the admin key you chose; the
+  key-management API underneath is additionally gated by the YunoHost
+  portal, granted to admins).
+  To read the admin key again later:
+      yunohost app setting $app admin_key
+  Create site keys in the dashboard, then embed the widget pinned to
+  @cap.js/widget@$widget_version on your sites (see the package README)."

@@ -1,0 +1,28 @@
+[Unit]
+Description=cap private redis (__APP__)
+After=network.target
+
+[Service]
+Type=notify
+User=__APP__
+Group=__APP__
+ExecStart=/usr/bin/redis-server __INSTALL_DIR__/redis.conf --supervised systemd
+Restart=on-failure
+RestartSec=5
+SyslogIdentifier=__APP__-redis
+OOMScoreAdjust=200
+
+; Hardening: the instance only ever needs its own data dir.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ReadWritePaths=__DATA_DIR__/redis
+
+[Install]
+WantedBy=multi-user.target

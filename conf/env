@@ -1,0 +1,29 @@
+# cap standalone server — per-instance environment
+# Rendered from conf/env by the YunoHost package. chmod 600, app user only:
+# contains the admin key and the private redis auth password.
+
+# ---- listen (loopback only; nginx is the public entrypoint) ----
+SERVER_HOSTNAME=127.0.0.1
+SERVER_PORT=__PORT__
+
+# ---- admin / key-management master key (>= 12 chars) ----
+ADMIN_KEY=__ADMIN_KEY__
+
+# ---- private per-app redis instance (loopback, port __REDIS_PORT__) ----
+REDIS_URL=redis://:__REDIS_PASSWORD__@127.0.0.1:__REDIS_PORT__
+
+# ---- client assets (widget.js / wasm) ----
+# OFF by default so no anonymous visitor ever gets a redirect or script URL
+# pointing at the path-less subdomain: embedded widgets should load the
+# official CDN copies pinned to the same versions recorded below. Flip the
+# two settings to "true"/pinned versions (see README.md) to self-mirror
+# them from this server instead; the /assets/* route is public in nginx.
+ENABLE_ASSETS_SERVER=__ASSETS_SERVER__
+WIDGET_VERSION=__WIDGET_VERSION__
+WASM_VERSION=__WASM_VERSION__
+CACHE_HOST=https://cdn.jsdelivr.net
+
+# ---- misc ----
+# X-Forwarded-For is set by nginx and stripped of client-forged copies.
+SHOW_ERRORS=false
+DEMO_MODE=false

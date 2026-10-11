@@ -1,0 +1,82 @@
+#!/bin/bash
+
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source ../settings/scripts/_common.sh
+source /usr/share/yunohost/helpers
+
+ynh_abort_if_errors
+
+#=================================================
+# RESTORE FILES
+#=================================================
+
+ynh_script_progression "Restoring the app files..."
+
+ynh_restore "$install_dir"
+ynh_restore "$data_dir"
+ynh_restore "/etc/nginx/conf.d/$domain.d/$app.conf"
+ynh_restore "/etc/systemd/system/$app.service"
+ynh_restore "/etc/systemd/system/${app}-redis.service"
+
+# ynh_restore's default-permission pass marks anything that is not exactly
+# $install_dir/$data_dir as a root-owned 400 system file: the vhost conf
+# must be readable by nginx workers, and the whole app tree (bun binary,
+# node_modules, redis dump dir) must belong to the app user again.
+chown root:www-data "/etc/nginx/conf.d/$domain.d/$app.conf"
+chmod 640 "/etc/nginx/conf.d/$domain.d/$app.conf"
+
+chown -R "$app:$app" "$install_dir"
+chmod 750 "$install_dir"
+chmod -R u=rwX,go-rwx "$install_dir"
+chmod 755 "$install_dir/bin/bun"
+
+chown -R "$app:$app" "$data_dir"
+chmod 750 "$data_dir" "$data_dir/redis"
+
+# Re-render the env + redis conf from the package template using CURRENT
+# settings instead of trusting the archived copies (secrets and pinned
+# versions in settings are authoritative; re-render also records fresh
+# checksums so the config panel/upgrades can track the files).
+admin_key=$(ynh_app_setting_get --app="$app" --key=admin_key)
+redis_password=$(ynh_app_setting_get --app="$app" --key=redis_password)
+widget_version=$(ynh_app_setting_get --app="$app" --key=widget_version)
+wasm_version=$(ynh_app_setting_get --app="$app" --key=wasm_version)
+assets_server=$(ynh_app_setting_get --app="$app" --key=assets_server)
+[ -n "$assets_server" ] || assets_server=false
+
+ynh_delete_file_checksum --file="$install_dir/redis.conf"
+redis_port="$port_redis"
+ynh_config_add --template=redis.conf --destination="$install_dir/redis.conf"
+chown "$app:$app" "$install_dir/redis.conf"
+chmod 640 "$install_dir/redis.conf"
+
+ynh_delete_file_checksum --file="$install_dir/env"
+ynh_config_add --template=env --destination="$install_dir/env"
+chown "$app:$app" "$install_dir/env"
+chmod 600 "$install_dir/env"
+
+#=================================================
+# RE-APPLY SERVICES AND START
+#=================================================
+
+ynh_script_progression "Restarting services..."
+
+if ! ynh_hide_warnings yunohost service status "$app" >/dev/null 2>&1; then
+    yunohost service add "$app" --description="cap proof-of-work captcha server"
+fi
+if ! ynh_hide_warnings yunohost service status "${app}-redis" >/dev/null 2>&1; then
+    yunohost service add "${app}-redis" --description="Private redis instance for cap ($app)"
+fi
+
+systemctl daemon-reload
+ynh_systemctl --service="${app}-redis" --action=start
+ynh_systemctl --service="$app" --action=start
+
+cap_wait_ready
+
+systemctl reload nginx || systemctl restart nginx
+
+ynh_script_progression "Restore complete for $app"

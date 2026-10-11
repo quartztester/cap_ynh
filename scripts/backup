@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source ../settings/scripts/_common.sh
+source /usr/share/yunohost/helpers
+
+#=================================================
+# DECLARE FILES TO BACK UP
+#=================================================
+
+ynh_print_info "Declaring files to be backed up..."
+
+ynh_backup "$install_dir"
+ynh_backup "$data_dir"
+
+ynh_backup "/etc/nginx/conf.d/$domain.d/$app.conf"
+ynh_backup "/etc/systemd/system/$app.service"
+ynh_backup "/etc/systemd/system/${app}-redis.service"
+
+#=================================================
+# DUMP THE PRIVATE REDIS INSTANCE
+#=================================================
+
+ynh_script_progression "Requesting a redis snapshot (BGSAVE)..."
+
+# The authoritative state (site keys + hashed secrets, API keys, share
+# links, settings) lives in the private redis. Ask it to flush its RDB so
+# the dump we copy is current, then wait for BGSAVE to complete. The RDB
+# itself is inside $data_dir and already declared above.
+redis_password=$(ynh_app_setting_get --app="$app" --key=redis_password)
+if redis-cli -h 127.0.0.1 -p "$port_redis" -a "$redis_password" --no-auth-warning bgsave >/dev/null 2>&1; then
+    for i in $(seq 1 60); do
+        last=$(redis-cli -h 127.0.0.1 -p "$port_redis" -a "$redis_password" --no-auth-warning lastsave 2>/dev/null)
+        [ -n "$last" ] && break
+        sleep 1
+    done
+else
+    ynh_print_warn "Could not reach the private redis for BGSAVE (not running?); backing up the last on-disk snapshot."
+fi
+
+ynh_print_info "Backup of $app prepared"

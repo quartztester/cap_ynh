@@ -1,0 +1,40 @@
+#!/bin/bash
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+ynh_abort_if_errors
+
+#=================================================
+# APPLY CHANGES
+#=================================================
+
+ynh_app_config_apply() {
+    _ynh_app_config_apply
+
+    # Panel values are bound to app settings ("settings" binds). Re-render
+    # the env file from the package template so it always carries every
+    # key (including secrets not exposed in the panel), then restart.
+    ynh_script_progression "Re-applying cap configuration..."
+
+    admin_key=$(ynh_app_setting_get --app="$app" --key=admin_key)
+    if [ -z "$admin_key" ] || [ "${#admin_key}" -lt 12 ]; then
+        ynh_die "The admin key must be at least 12 characters."
+    fi
+    redis_password=$(ynh_app_setting_get --app="$app" --key=redis_password)
+    widget_version=$(ynh_app_setting_get --app="$app" --key=widget_version)
+    wasm_version=$(ynh_app_setting_get --app="$app" --key=wasm_version)
+    assets_server=$(ynh_app_setting_get --app="$app" --key=assets_server)
+    [ -n "$assets_server" ] || assets_server=false
+
+    redis_port="$port_redis"
+    ynh_delete_file_checksum --file="$install_dir/env"
+    ynh_config_add --template=env --destination="$install_dir/env"
+    chown "$app:$app" "$install_dir/env"
+    chmod 600 "$install_dir/env"
+
+    ynh_systemctl --service="$app" --action=restart
+    cap_wait_ready
+}
+
+ynh_app_config_run $1
