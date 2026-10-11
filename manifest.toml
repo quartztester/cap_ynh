@@ -25,9 +25,11 @@ helpers_version = "2.1"
 architectures = ["amd64", "arm64"]
 multi_instance = true
 ldap = "not_relevant"
-# The admin surface (dashboard, key-management API) is gated by the
-# YunoHost portal; the captcha endpoints visitors use stay public.
-sso = "partial"
+# The admin surface (dashboard, key-management API) is portal-gated with
+# ssowat regex permissions (see [resources.permissions]); the captcha
+# endpoints visitors use stay public. Catalog-level sso key must be a
+# boolean or "not_relevant" — portal-gated = true.
+sso = true
 disk = "1G"
 ram.build = "512M"
 ram.runtime = "384M"
