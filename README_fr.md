@@ -1,4 +1,7 @@
-# cap pour YunoHost
+<h1>
+  <img src="logos/cap.png" width="48" alt="cap captcha logo">
+  cap pour YunoHost
+</h1>
 
 Captcha auto-hébergé respectueux de la vie privée : preuve de travail, sans
 énigmes, sans pistage. Les visiteurs résolvent une petite preuve de travail
@@ -30,5 +33,5 @@ dans leur navigateur ; aucune donnée personnelle n'est collectée.
 
 ## Screenshots
 
-![Admin dashboard gate (portal login, then instance admin key)](./doc/screenshots/dashboard.png)
+![cap captcha — dashboard](./doc/screenshots/dashboard.png)
 

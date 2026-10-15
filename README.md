@@ -77,5 +77,5 @@ bump the bun asset if needed; `bun install --frozen-lockfile` rebuilds
 
 ## Screenshots
 
-![Admin dashboard gate (portal login, then instance admin key)](./doc/screenshots/dashboard.png)
+![cap captcha — dashboard](./doc/screenshots/dashboard.png)
 
