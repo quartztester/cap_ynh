@@ -74,3 +74,8 @@ bump the bun asset if needed; `bun install --frozen-lockfile` rebuilds
 - If you also proxy the domain through Cloudflare, cap's `CF-Connecting-IP`
   support picks the real IP up automatically (X-Forwarded-For is set by
   nginx regardless).
+
+## Screenshots
+
+![Admin dashboard gate (portal login, then instance admin key)](./doc/screenshots/dashboard.png)
+

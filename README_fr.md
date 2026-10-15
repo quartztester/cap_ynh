@@ -27,3 +27,8 @@ dans leur navigateur ; aucune donnée personnelle n'est collectée.
 - Projet amont : <https://github.com/tiagozip/cap>
 - Documentation amont : <https://trycap.dev>
 - Paquet YunoHost : <https://github.com/quartztester/cap_ynh>
+
+## Screenshots
+
+![Admin dashboard gate (portal login, then instance admin key)](./doc/screenshots/dashboard.png)
+
