@@ -6,3 +6,5 @@
 .tests.v1.schema.json
 .spdx_licenses
 .config_panel.v1.schema.json
+.editorconfig
+.gitattributes

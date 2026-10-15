@@ -3,6 +3,5 @@
 test_format = 1.0
 
 [default]
-    # cap serves the widget from the site root; sub-path installs are
-    # refused by the install script itself.
-    exclude = ["install.subdir"]
+
+    args.admin_key = "ci-admin-key"
