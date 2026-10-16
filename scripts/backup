@@ -41,4 +41,8 @@ else
     ynh_print_warn "Could not reach the private redis for BGSAVE (not running?); backing up the last on-disk snapshot."
 fi
 
+#=================================================
+# END OF SCRIPT
+#=================================================
+
 ynh_print_info "Backup of $app prepared"

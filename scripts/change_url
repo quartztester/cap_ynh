@@ -55,4 +55,8 @@ ynh_systemctl --service="$app" --action=start
 
 cap_wait_ready
 
+#=================================================
+# END OF SCRIPT
+#=================================================
+
 ynh_script_progression "Change of URL completed for $app"

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#=================================================
+# COMMON VARIABLES AND CUSTOM HELPERS
+#=================================================
+
 # Shared helpers for the cap package.
 
 # Wait until cap answers 200 on /health (app AND redis healthy).

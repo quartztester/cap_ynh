@@ -79,4 +79,8 @@ cap_wait_ready
 
 systemctl reload nginx || systemctl restart nginx
 
+#=================================================
+# END OF SCRIPT
+#=================================================
+
 ynh_script_progression "Restore complete for $app"

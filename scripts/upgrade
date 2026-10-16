@@ -105,4 +105,8 @@ if ! ynh_hide_warnings yunohost service status "${app}-redis" >/dev/null 2>&1; t
     yunohost service add "${app}-redis" --description="Private redis instance for cap ($app)"
 fi
 
+#=================================================
+# END OF SCRIPT
+#=================================================
+
 ynh_script_progression "Upgrade complete."

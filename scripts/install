@@ -62,7 +62,7 @@ ynh_setup_source --source_id=bun --dest_dir="$install_dir/bin"
 chmod 755 "$install_dir/bin/bun"
 
 #=================================================
-# INSTALL JS DEPENDENCIES (offline, from bun.lock)
+# INSTALL JS DEPENDENCIES (OFFLINE, FROM BUN.LOCK)
 #=================================================
 
 ynh_script_progression "Installing JS dependencies with bun (elysia, maxmind, capjs-core)..."
@@ -80,7 +80,7 @@ ynh_app_setting_set --key=bun_version --value="1.4.3"
 chown -R "$app:$app" "$install_dir"
 
 #=================================================
-# PRIVATE REDIS INSTANCE (config + systemd unit)
+# PRIVATE REDIS INSTANCE (CONFIG + SYSTEMD UNIT)
 #=================================================
 
 ynh_script_progression "Configuring cap's private redis instance..."

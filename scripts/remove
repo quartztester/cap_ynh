@@ -41,4 +41,8 @@ ynh_config_remove_nginx
 # Leave redis-server apt packages in place: the shared system redis from
 # Debian may be (re)used by other apps and YunoHost itself.
 
+#=================================================
+# END OF SCRIPT
+#=================================================
+
 ynh_script_progression "cap has been removed."
