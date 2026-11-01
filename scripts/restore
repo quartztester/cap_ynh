@@ -72,6 +72,9 @@ if ! ynh_hide_warnings yunohost service status "${app}-redis" >/dev/null 2>&1; t
 fi
 
 systemctl daemon-reload
+# Enable or the CI post-step `systemctl isolate multi-user.target` kills the
+# restored-but-disabled units before validation curls them.
+systemctl enable "${app}-redis" "$app" --quiet
 ynh_systemctl --service="${app}-redis" --action=start
 ynh_systemctl --service="$app" --action=start
 
