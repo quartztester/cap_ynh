@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Shared helpers for the cap package.
 
 # Wait until cap answers 200 on /health (app AND redis healthy).
 cap_wait_ready() {
@@ -18,13 +17,7 @@ cap_wait_ready() {
     fi
 }
 
-# Move the standalone server out of the extracted monorepo ($install_dir/.repo,
-# from ynh_setup_source --dest_dir="$install_dir/.repo") into $install_dir,
-# replacing the previous app files but preserving node_modules / .bun-cache /
-# bin/ / env / redis.conf. in_subdir=2 is NOT usable: tar --strip-components=2
-# flattens EVERY second-level dir, so docs/package.json clobbers
-# standalone/package.json (wrong dependency tree — this broke the first
-# packaging attempt).
+# in_subdir=2 would flatten every second-level dir and clobber standalone/package.json; hand-move standalone/ out, preserving node_modules/.bun-cache/bin/env/redis.conf.
 cap_place_standalone() {
     local repo_dir="$install_dir/.repo"
     [ -d "$repo_dir/standalone" ] || ynh_die "extracted source has no standalone/ subdir"
