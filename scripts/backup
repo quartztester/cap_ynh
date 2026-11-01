@@ -24,7 +24,7 @@ ynh_backup "/etc/systemd/system/${app}-redis.service"
 # DUMP THE PRIVATE REDIS INSTANCE
 #=================================================
 
-ynh_script_progression "Requesting a redis snapshot (BGSAVE)..."
+ynh_print_info "Requesting a redis snapshot (BGSAVE)..."
 
 # The authoritative state (site keys + hashed secrets, API keys, share
 # links, settings) lives in the private redis. Ask it to flush its RDB so

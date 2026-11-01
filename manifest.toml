@@ -7,7 +7,7 @@ name = "cap"
 description.en = "Privacy-first self-hosted captcha: proof-of-work, no puzzles, no tracking"
 description.fr = "Captcha auto-hébergé respectueux de la vie privée : preuve de travail, sans énigme ni pistage"
 
-version = "3.1.13~ynh1"
+version = "3.1.13~ynh2"
 
 maintainers = ["quartztester"]
 

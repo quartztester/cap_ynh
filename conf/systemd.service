@@ -18,15 +18,17 @@ SyslogIdentifier=__APP__
 
 ; Hardening. NB: no ProtectHome — bun may touch $HOME for its cache and the
 ; data_dir lives under /home/yunohost.app.
-NoNewPrivileges=yes
-PrivateTmp=yes
-PrivateDevices=yes
-ProtectSystem=full
-ProtectHome=no
-ProtectKernelTunables=yes
-ProtectControlGroups=yes
+ NoNewPrivileges=yes
+ PrivateTmp=yes
+ PrivateDevices=yes
+ ProtectSystem=full
+ ProtectHome=no
+ ProtectKernelTunables=yes
+ ProtectControlGroups=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes
 
+ SystemCallFilter=~@clock @debug @module @mount @obsolete @reboot @setuid @swap @cpu-emulation @privileged
+ CapabilityBoundingSet=
 [Install]
 WantedBy=multi-user.target
