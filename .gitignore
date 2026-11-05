@@ -1,3 +1,9 @@
 *~
 *.sw[op]
 .DS_Store
+
+# package_linter artifacts — regenerated on every lint run, never commit
+.manifest.v2.schema.json
+.tests.v1.schema.json
+.config_panel.v1.schema.json
+.spdx_licenses
