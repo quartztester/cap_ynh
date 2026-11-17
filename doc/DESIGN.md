@@ -1,6 +1,30 @@
+# How this package works
+
+Two parts: first a walkthrough of what actually happens during install,
+upgrade, and backup; then the non-obvious choices explained. Anything not
+mentioned is standard YunoHost boilerplate identical in most packages.
+
+## Install, in order
+
+1. The installer asks for domain, path, and an [admin key](../manifest.toml#L47-L53) (min 12 chars, checked in [scripts/install L23-L26](../scripts/install#L23-L26)). Path must be `/` or install [stops immediately](../scripts/install#L16-L21).
+2. The redis password is [generated and stored in app settings](../scripts/install#L32-L37) along with the admin key. Settings are the source of truth: every later re-render reads from them, never from the archived env file.
+3. The monorepo tarball and the [pinned bun binary](../scripts/install#L55-L62) download into `$install_dir`; [cap_place_standalone](../scripts/_common.sh#L20-L39) moves the `standalone/` subdir up into place, keeping `node_modules`, `bin/`, `env` from a previous version.
+4. `bun install --frozen-lockfile` installs JS deps [offline from the lockfile](../scripts/install#L68-L76).
+5. The private redis renders [its own config](../scripts/install#L86-L94) and gets [its own systemd unit](../conf/redis.service); install [pings it until PONG](../scripts/install#L103-L111).
+6. The app's [env file](../scripts/install#L117-L121) (admin key + redis password, chmod 600) and [systemd unit](../conf/systemd.service) render, then the app starts and install [waits for /health to report ok](../scripts/_common.sh#L4-L18) before declaring success.
+7. Nginx is configured last ([6 locations](../conf/nginx.conf)), the only public surface: captcha endpoints open to the internet, admin paths blocked by the YunoHost portal.
+
+## Upgrade
+
+Stops the app, swaps sources the same way as install, re-renders env/redis configs [from current settings](../scripts/upgrade#L64-L83), restarts redis then app, waits for health again. Nothing else to know: settings and `$data_dir` survive untouched.
+
+## Backup / restore
+
+Backup asks redis to [flush its RDB to disk before the archive copies](../scripts/backup#L27-L42) (the on-disk dump can be 60 s stale). Restore re-renders env/redis.conf from settings instead of trusting archived copies ([restore L39-L59](../scripts/restore#L39-L59)).
+
 # Design decisions
 
-Why this package is structured the way it is. Links go to the exact code.
+Why the pieces above are built the way they are. Links go to the exact code.
 
 ## Bun runtime instead of Node or Docker
 
