@@ -6,7 +6,7 @@ mentioned is standard YunoHost boilerplate identical in most packages.
 
 ## Install, in order
 
-1. The installer asks for domain, path, and an [admin key](../manifest.toml#L47-L53) (min 12 chars, checked in [scripts/install L23-L26](../scripts/install#L23-L26)). Path must be `/` or install [stops immediately](../scripts/install#L16-L21).
+1. The installer asks for domain, path, and an [admin key](../manifest.toml#L46-L51) (min 12 chars, checked in [scripts/install L23-L26](../scripts/install#L23-L26)). Path must be `/` or install [stops immediately](../scripts/install#L16-L21).
 2. The redis password is [generated and stored in app settings](../scripts/install#L32-L37) along with the admin key. Settings are the source of truth: every later re-render reads from them, never from the archived env file.
 3. The monorepo tarball and the [pinned bun binary](../scripts/install#L55-L62) download into `$install_dir`; [cap_place_standalone](../scripts/_common.sh#L20-L39) moves the `standalone/` subdir up into place, keeping `node_modules`, `bin/`, `env` from a previous version.
 4. `bun install --frozen-lockfile` installs JS deps [offline from the lockfile](../scripts/install#L68-L76).
